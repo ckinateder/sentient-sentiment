@@ -3,6 +3,8 @@
 import jsonlines
 import re
 import os
+from pathlib import Path
+import keras
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -26,6 +28,7 @@ from operator import xor
 import nltk
 from keras import backend as K
 from scipy.interpolate import interp1d
+import pickle
 
 nltk.download("stopwords")
 nltk.download("wordnet")
@@ -128,8 +131,25 @@ class V1:
             f"Model accuracy on test set with {y_test.shape[0]} rows: {accuracy*100:0.2f}%")
         return loss, accuracy
 
-    def save(self, path: str):
-        self.model.save(path, overwrite=True)
+    def save(self, path: str) -> None:
+        """Takes a directory and saves both the model and tokenizer
+        Tree:
+        path
+        --model
+        --tokenizer
+        """
+        if not os.path.exists(path):
+            os.mkdir(path)
+        with open(os.path.join(path, "tokenizer"), "ab") as f:
+            pickle.dump(self.tokenizer, f)
+        self.model.save(os.path.join(path, "model"), overwrite=True)
+
+    def load(self, path: str) -> None:
+        """Takes a directory and loads both the model and tokenizer
+        """
+        with open(os.path.join(path, "tokenizer"), "rb") as f:
+            self.tokenizer = pickle.load(f)
+        self.model = keras.models.load_model(os.path.join(path, "model"))
 
 
 if __name__ == "__main__":
@@ -179,5 +199,5 @@ if __name__ == "__main__":
     # remove neutral rows cause they do not matter
     data = data[data[SCORE_COL] != "neutral"]
     data = data.sample(frac=1).reset_index(drop=True)  # shuffle
-
     v1.fit(data)
+    v1.save("trained107")

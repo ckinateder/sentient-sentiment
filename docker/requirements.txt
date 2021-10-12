@@ -25,6 +25,7 @@ dateparser==1.0.0
 DateTime==4.3
 decorator==4.4.2
 Deprecated==1.2.12
+dill==0.3.4
 elasticsearch==7.13.1
 fake-useragent==0.1.11
 feedfinder2==0.0.4
