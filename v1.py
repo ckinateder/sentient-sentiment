@@ -1,18 +1,14 @@
 # sentient sentiment v1
 
-import jsonlines
-import re
-import os
-from pathlib import Path
-import keras
-import numpy as np
-import tensorflow as tf
-import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
-from keras.layers import Dense, Embedding, LSTM, SpatialDropout1D, Bidirectional
-from keras.preprocessing.sequence import pad_sequences
-from keras.preprocessing.text import Tokenizer
-from keras.models import Sequential, load_model
+import pickle
+from scipy.interpolate import interp1d
+from keras import backend as K
+import nltk
+from operator import xor
+import pandas as pd
+from nltk.corpus import stopwords
+from textblob import Word
+from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import (
     classification_report,
     confusion_matrix,
@@ -20,16 +16,23 @@ from sklearn.metrics import (
     mean_absolute_error,
     mean_squared_error,
 )
-from sklearn.preprocessing import LabelEncoder
-from textblob import Word
-from nltk.corpus import stopwords
-import pandas as pd
-from operator import xor
-import nltk
-from keras import backend as K
-from scipy.interpolate import interp1d
-import pickle
-
+from keras.models import Sequential, load_model
+from keras.preprocessing.text import Tokenizer
+from keras.preprocessing.sequence import pad_sequences
+from keras.layers import Dense, Embedding, LSTM, SpatialDropout1D, Bidirectional
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+import tensorflow as tf
+import numpy as np
+import keras
+from pathlib import Path
+import os
+import re
+import jsonlines
+from pprint import pprint
+from numpy.random import seed
+seed(42)
+tf.random.set_seed(42)
 nltk.download("stopwords")
 nltk.download("wordnet")
 
@@ -94,15 +97,12 @@ class V1:
 
     def create_X(self, texts: pd.Series):
         sequences = self.tokenizer.texts_to_sequences(self.clean(texts).values)
-        # set max length here
         return pad_sequences(sequences, maxlen=self.MAX_LENGTH)
 
     def fit(self, data, verbose: int = 1) -> tuple:
-        data[SCORE_COL] = self.labelEncoder.fit_transform(data[SCORE_COL])
+        # data[SCORE_COL] = self.labelEncoder.fit_transform(data[SCORE_COL])
         data[TEXT_COL] = self.clean(data[TEXT_COL])
         self.tokenizer.fit_on_texts(data[TEXT_COL].values)
-        # pickle tokenizer
-        # --
 
         # create sequences
         sequences = self.tokenizer.texts_to_sequences(data[TEXT_COL].values)
@@ -140,21 +140,33 @@ class V1:
         """
         if not os.path.exists(path):
             os.mkdir(path)
-        with open(os.path.join(path, "tokenizer"), "ab") as f:
+        with open(os.path.join(path, "tokenizer"), "w+b") as f:
             pickle.dump(self.tokenizer, f)
+        with open(os.path.join(path, "max_len"), "w+b") as f:
+            pickle.dump(self.MAX_LENGTH, f)
         self.model.save(os.path.join(path, "model"), overwrite=True)
+        print("Saved model to", path)
 
     def load(self, path: str) -> None:
         """Takes a directory and loads both the model and tokenizer
         """
         with open(os.path.join(path, "tokenizer"), "rb") as f:
             self.tokenizer = pickle.load(f)
+        with open(os.path.join(path, "max_len"), "rb") as f:
+            self.MAX_LENGTH = pickle.load(f)
         self.model = keras.models.load_model(os.path.join(path, "model"))
+        print("Loaded model from", path)
+
+    def score(self, *args) -> dict:  # predict score for a text input, and return % positive
+        interp = interp1d([0, 1], [-1, 1])
+        values = {}
+        y = self.model.predict(self.create_X(pd.Series([*args])))
+        for i in range(len(args)):
+            values[args[i]] = round(float(interp(y[i][1])), 4)
+        return values
 
 
-if __name__ == "__main__":
-    v1 = V1()
-
+def load_data():
     """load datasets"""
     def read_jsonl(path: str) -> pd.DataFrame:
         out = []
@@ -168,6 +180,7 @@ if __name__ == "__main__":
             [df[col] > 3, df[col] == 3, df[col] < 3], [
                 "positive", "neutral", "negative"]
         )
+    labelEncoder = LabelEncoder()
 
     # from http://jmcauley.ucsd.edu/data/amazon/
     amazon_set_1 = read_jsonl("datasets/reviews_Musical_Instruments_5.json")[
@@ -199,5 +212,38 @@ if __name__ == "__main__":
     # remove neutral rows cause they do not matter
     data = data[data[SCORE_COL] != "neutral"]
     data = data.sample(frac=1).reset_index(drop=True)  # shuffle
-    v1.fit(data)
-    v1.save("trained107")
+    data[SCORE_COL] = labelEncoder.fit_transform(data[SCORE_COL])
+    return data
+
+
+def equalize_distribution(data: pd.DataFrame) -> pd.DataFrame:
+    pos_count = data[data[SCORE_COL] == 'positive'].shape[0]
+    neg_count = data[data[SCORE_COL] == 'negative'].shape[0]
+    if pos_count > neg_count:
+        data[data[SCORE_COL] == 'positive'] = data[data[SCORE_COL]
+                                                   == 'positive'][-neg_count:]
+        data = data.dropna()
+    elif neg_count > pos_count:
+        data[data[SCORE_COL] == 'negative'] = data[data[SCORE_COL]
+                                                   == 'negative'][-pos_count:]
+        data = data.dropna()
+    return data
+
+
+if __name__ == "__main__":
+    NUM_EPOCHS = 10
+    v1 = V1()
+    #data = equalize_distribution(load_data())
+
+    v1.load("trained107")
+    pprint(v1.score("Apple's sales dropped 10 percent today", "the most amazing product",
+                    "your mom is the best", "i love your mom", "you're the worst"))
+
+
+"""
+To put in writeup:
+inputs must  be in format
+outputs will be  same way
+where saving happens
+sample full cycle
+"""
