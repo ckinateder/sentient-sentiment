@@ -166,6 +166,7 @@ class V1:
         # build model to length size
         self.build_model()
 
+        # fit model with params
         logging.info(
             f"Fitting model with params {self.params} on dataset with shape {X_train.shape}"
         )
@@ -266,7 +267,7 @@ def load_data():
     ].rename(columns={"summary": TEXT_COL, "overall": SCORE_COL})
     filter(amazon_set_5, SCORE_COL)
 
-    finance_set_1 = pd.read_csv("datasets/small/all-data.csv", encoding="ISO-8859-1")
+    finance_set_1 = pd.read_csv("datasets/finance-headlines.csv", encoding="ISO-8859-1")
     finance_set_1.columns = [SCORE_COL, TEXT_COL]
 
     data = pd.concat(
@@ -282,28 +283,29 @@ def load_data():
     # remove neutral rows cause they do not matter
     data = data[data[SCORE_COL] != "neutral"]
     data = data.sample(frac=1).reset_index(drop=True)  # shuffle
-    data[SCORE_COL] = labelEncoder.fit_transform(data[SCORE_COL])
+
+    data[SCORE_COL] = np.select(
+        [data[SCORE_COL] == "positive", data[SCORE_COL] == "negative"],
+        [1, 0],
+    )  # convert to 1 for positive and 0 for negative
+
     return data
 
 
 def equalize_distribution(data: pd.DataFrame) -> pd.DataFrame:
-    pos_count = data[data[SCORE_COL] == "positive"].shape[0]
-    neg_count = data[data[SCORE_COL] == "negative"].shape[0]
+    pos_count = data[data[SCORE_COL] == 1].shape[0]
+    neg_count = data[data[SCORE_COL] == 0].shape[0]
     if pos_count > neg_count:
-        data[data[SCORE_COL] == "positive"] = data[data[SCORE_COL] == "positive"][
-            -neg_count:
-        ]
+        data[data[SCORE_COL] == 1] = data[data[SCORE_COL] == 1][-neg_count:]
         data = data.dropna()
     elif neg_count > pos_count:
-        data[data[SCORE_COL] == "negative"] = data[data[SCORE_COL] == "negative"][
-            -pos_count:
-        ]
+        data[data[SCORE_COL] == 0] = data[data[SCORE_COL] == 0][-pos_count:]
         data = data.dropna()
     return data
 
 
 if __name__ == "__main__":
-    v1 = V1(epochs=12)
+    v1 = V1(epochs=8)
     data = equalize_distribution(load_data())
     v1.fit(data)
     v1.save("trained107")
@@ -317,10 +319,3 @@ if __name__ == "__main__":
             "you're the worst",
         )
     )
-"""
-To put in writeup:
-inputs must  be in format
-outputs will be  same way
-where saving happens
-sample full cycle
-"""
