@@ -1,64 +1,61 @@
 # sentient sentiment v1
 
+import logging
+from numpy.random import seed
+from pprint import pprint
+import jsonlines
+import re
+import os
+import keras
+import numpy as np
 import pickle
 from scipy.interpolate import interp1d
 from keras import backend as K
 import nltk
-from operator import xor
 import pandas as pd
 from nltk.corpus import stopwords
 from textblob import Word
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import (
-    classification_report,
-    confusion_matrix,
-    accuracy_score,
-    mean_absolute_error,
-    mean_squared_error,
-)
-from keras.models import Sequential, load_model
+from keras.models import Sequential
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from keras.layers import Dense, Embedding, LSTM, SpatialDropout1D, Bidirectional
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import tensorflow as tf
-import numpy as np
-import keras
-from pathlib import Path
-import os
-import re
-import jsonlines
-from pprint import pprint
-from numpy.random import seed
+tf.get_logger().setLevel('ERROR')  # disable kernel warnings
+logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
+
 seed(42)
 tf.random.set_seed(42)
-nltk.download("stopwords")
-nltk.download("wordnet")
 
 NUM_WORDS = 8192  # number of unique words #(10000)
 LSTM_UNITS = 256  # lstm cells #(300)
 EMBED_OUT_DIM = 512
 NUM_CLASSES = 2  # is overwritten based on number of unique vals in data
-NUM_EPOCHS = 8  # keep lower to avoid overfitting
+NUM_EPOCHS = 12  # keep lower to avoid overfitting
 TEXT_COL = "text"
 SCORE_COL = "sentiment"
 BATCH_SIZE = 512  # (400)
 TEST_SIZE = 0.2  #
 
-# get stop words
-stop_words = stopwords.words("english")
-
 
 class V1:
     def __init__(self, path=None) -> None:
-        # tokenizer and encoderpip3 inst
+        # get stopwords
+        try:
+            self.stop_words = stopwords.words("english")
+        except:
+            nltk.download("stopwords")
+            nltk.download("wordnet")
+            self.stop_words = stopwords.words("english")
+
         self.tokenizer = Tokenizer(
             num_words=NUM_WORDS, split=' ')  # OR load from pickle
         self.labelEncoder = LabelEncoder()
         self.MAX_LENGTH = 0
         if path:
-            pass
+            self.load(path)  # load model and everything if provided path
 
     def build_model(self) -> None:
         # model
@@ -125,9 +122,9 @@ class V1:
         acc_and_loss = self.model.evaluate(X_test, y_test)
         loss = acc_and_loss[0]
         accuracy = acc_and_loss[1]
-        print(
+        logging.info(
             f"Model loss on test set with {y_test.shape[0]} rows: {loss:.4f}")
-        print(
+        logging.info(
             f"Model accuracy on test set with {y_test.shape[0]} rows: {accuracy*100:0.2f}%")
         return loss, accuracy
 
@@ -145,7 +142,7 @@ class V1:
         with open(os.path.join(path, "max_len"), "w+b") as f:
             pickle.dump(self.MAX_LENGTH, f)
         self.model.save(os.path.join(path, "model"), overwrite=True)
-        print("Saved model to", path)
+        logging.info(f"Saved model to '{path}'")
 
     def load(self, path: str) -> None:
         """Takes a directory and loads both the model and tokenizer
@@ -155,7 +152,7 @@ class V1:
         with open(os.path.join(path, "max_len"), "rb") as f:
             self.MAX_LENGTH = pickle.load(f)
         self.model = keras.models.load_model(os.path.join(path, "model"))
-        print("Loaded model from", path)
+        logging.info(f"Loaded model from '{path}'")
 
     def score(self, *args) -> dict:  # predict score for a text input, and return % positive
         interp = interp1d([0, 1], [-1, 1])
@@ -231,11 +228,11 @@ def equalize_distribution(data: pd.DataFrame) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    NUM_EPOCHS = 10
-    v1 = V1()
+    v1 = V1("trained107")
     #data = equalize_distribution(load_data())
-
-    v1.load("trained107")
+    # v1.fit(data)
+    # v1.save("trained107")
+    # v1.load("trained107")
     pprint(v1.score("Apple's sales dropped 10 percent today", "the most amazing product",
                     "your mom is the best", "i love your mom", "you're the worst"))
 
