@@ -66,27 +66,29 @@ def load_data():
 
     data[SCORE_COL] = np.select(
         [data[SCORE_COL] == "positive", data[SCORE_COL] == "negative"],
-        [1, 0],
+        [1, -1],
     )  # convert to 1 for positive and 0 for negative
 
     return data
 
 
-def equalize_distribution(data: pd.DataFrame) -> pd.DataFrame:
+def equalize_distribution(
+    data: pd.DataFrame, pos_val: float = 1, neg_val: float = 0
+) -> pd.DataFrame:
     """Evenly distribute dataset. Use wisely"""
-    pos_count = data[data[SCORE_COL] == 1].shape[0]
-    neg_count = data[data[SCORE_COL] == 0].shape[0]
+    pos_count = data[data[SCORE_COL] == pos_val].shape[0]
+    neg_count = data[data[SCORE_COL] == neg_val].shape[0]
     if pos_count > neg_count:
-        data[data[SCORE_COL] == 1] = data[data[SCORE_COL] == 1][-neg_count:]
+        data[data[SCORE_COL] == pos_val] = data[data[SCORE_COL] == pos_val][-neg_count:]
         data = data.dropna()
     elif neg_count > pos_count:
-        data[data[SCORE_COL] == 0] = data[data[SCORE_COL] == 0][-pos_count:]
+        data[data[SCORE_COL] == neg_val] = data[data[SCORE_COL] == neg_val][-pos_count:]
         data = data.dropna()
     return data
 
 
 if __name__ == "__main__":
     v1 = V1(epochs=8)
-    data = equalize_distribution(load_data()).reset_index(drop=True)
+    data = load_data()
     v1.fit(data)
     v1.save("test-model")

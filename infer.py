@@ -3,13 +3,13 @@ from pprint import pprint
 
 if __name__ == "__main__":
     v1 = V1()
-    v1.load("test-model")
+    v1.load("trained107")
     pprint(
         v1.score(
-            "Apple's sales dropped 10 percent today",
-            "the most amazing product",
-            "your mom is the best",
-            "i love your mom",
-            "you're the worst",
+            "Bitcoin tops $60,000 for first time in six months as traders bet on ETF approval",
+            "Bitcoin $100,000 may be conservative, analyst says",
+            "Bitcoin Rally Reaches Its Risky Level For October",
+            "Dow adds 300 points following earnings beats, surprise retail sales gain",
+            "Professor who called Dow 20,000 says he’s nervous about trends in inflation that could spark a stock-market correction",
         )
     )
