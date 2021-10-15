@@ -2,10 +2,9 @@
 
 import logging
 from numpy.random import seed
-from pprint import pprint
-import jsonlines
 import re
 import os
+import sys
 import keras
 import numpy as np
 import pickle
@@ -143,7 +142,9 @@ class V1:
 
     def fit(self, data: pd.DataFrame, verbose: int = 1) -> tuple:
         """Fit the model on the given data"""
-        # data[SCORE_COL] = self.labelEncoder.fit_transform(data[SCORE_COL])
+        assert (
+            TEXT_COL in data.columns and SCORE_COL in data.columns
+        ), "TEXT_COL/SCORE_COL not in data!"
         data[TEXT_COL] = self.clean(data[TEXT_COL])
         self.tokenizer.fit_on_texts(data[TEXT_COL].values)
 
@@ -194,23 +195,30 @@ class V1:
         --model
         --tokenizer
         """
-        if not os.path.exists(path):
-            os.mkdir(path)
-        with open(os.path.join(path, "tokenizer"), "w+b") as f:
-            pickle.dump(self.tokenizer, f)
-        with open(os.path.join(path, "max_len"), "w+b") as f:
-            pickle.dump(self.MAX_LENGTH, f)
-        self.model.save(os.path.join(path, "model"), overwrite=True)
-        logging.info(f"Saved model to '{path}'")
+        try:
+            if not os.path.exists(path):
+                os.mkdir(path)
+            with open(os.path.join(path, "tokenizer"), "w+b") as f:
+                pickle.dump(self.tokenizer, f)
+            with open(os.path.join(path, "max_len"), "w+b") as f:
+                pickle.dump(self.MAX_LENGTH, f)
+            self.model.save(os.path.join(path, "model"), overwrite=True)
+            logging.info(f"Saved model to '{path}'")
+        except:
+            logging.warning(f"Could not save model to '{path}'")
 
     def load(self, path: str) -> None:
         """Takes a directory and loads both the model and tokenizer"""
-        with open(os.path.join(path, "tokenizer"), "rb") as f:
-            self.tokenizer = pickle.load(f)
-        with open(os.path.join(path, "max_len"), "rb") as f:
-            self.MAX_LENGTH = pickle.load(f)
-        self.model = keras.models.load_model(os.path.join(path, "model"))
-        logging.info(f"Loaded model from '{path}'")
+        try:
+            with open(os.path.join(path, "tokenizer"), "rb") as f:
+                self.tokenizer = pickle.load(f)
+            with open(os.path.join(path, "max_len"), "rb") as f:
+                self.MAX_LENGTH = pickle.load(f)
+            self.model = keras.models.load_model(os.path.join(path, "model"))
+            logging.info(f"Loaded model from '{path}'")
+        except:
+            logging.error(f"Could not load model from '{path}'")
+            sys.exit(1)
 
     def score(
         self, *args
@@ -221,101 +229,3 @@ class V1:
         for i in range(len(args)):
             values[args[i]] = round(float(interp(y[i][1])), 4)
         return values
-
-
-def load_data():
-    """load datasets"""
-
-    def read_jsonl(path: str) -> pd.DataFrame:
-        out = []
-        with jsonlines.open(path) as f:
-            for line in f.iter():
-                out.append(line)
-        return pd.DataFrame(out)
-
-    def filter(df: pd.DataFrame, col: str):
-        df[col] = np.select(
-            [df[col] > 3, df[col] == 3, df[col] < 3],
-            ["positive", "neutral", "negative"],
-        )
-
-    labelEncoder = LabelEncoder()
-
-    # from http://jmcauley.ucsd.edu/data/amazon/
-    amazon_set_1 = read_jsonl("datasets/reviews_Musical_Instruments_5.json")[
-        ["summary", "overall"]
-    ].rename(columns={"summary": TEXT_COL, "overall": SCORE_COL})
-    filter(amazon_set_1, SCORE_COL)
-
-    amazon_set_2 = read_jsonl("datasets/reviews_Office_Products_5.json")[
-        ["summary", "overall"]
-    ].rename(columns={"summary": TEXT_COL, "overall": SCORE_COL})
-    filter(amazon_set_2, SCORE_COL)
-
-    amazon_set_3 = read_jsonl("datasets/reviews_Tools_and_Home_Improvement_5.json")[
-        ["summary", "overall"]
-    ].rename(columns={"summary": TEXT_COL, "overall": SCORE_COL})
-    filter(amazon_set_3, SCORE_COL)
-
-    amazon_set_4 = read_jsonl("datasets/reviews_Toys_and_Games_5.json")[
-        ["summary", "overall"]
-    ].rename(columns={"summary": TEXT_COL, "overall": SCORE_COL})
-    filter(amazon_set_4, SCORE_COL)
-
-    amazon_set_5 = read_jsonl("datasets/reviews_Home_and_Kitchen_5.json")[
-        ["summary", "overall"]
-    ].rename(columns={"summary": TEXT_COL, "overall": SCORE_COL})
-    filter(amazon_set_5, SCORE_COL)
-
-    finance_set_1 = pd.read_csv("datasets/finance-headlines.csv", encoding="ISO-8859-1")
-    finance_set_1.columns = [SCORE_COL, TEXT_COL]
-
-    data = pd.concat(
-        [
-            finance_set_1,
-            amazon_set_1,
-            amazon_set_2,
-            amazon_set_3,
-            amazon_set_4,
-            amazon_set_5,
-        ]
-    )
-    # remove neutral rows cause they do not matter
-    data = data[data[SCORE_COL] != "neutral"]
-    data = data.sample(frac=1).reset_index(drop=True)  # shuffle
-
-    data[SCORE_COL] = np.select(
-        [data[SCORE_COL] == "positive", data[SCORE_COL] == "negative"],
-        [1, 0],
-    )  # convert to 1 for positive and 0 for negative
-
-    return data
-
-
-def equalize_distribution(data: pd.DataFrame) -> pd.DataFrame:
-    pos_count = data[data[SCORE_COL] == 1].shape[0]
-    neg_count = data[data[SCORE_COL] == 0].shape[0]
-    if pos_count > neg_count:
-        data[data[SCORE_COL] == 1] = data[data[SCORE_COL] == 1][-neg_count:]
-        data = data.dropna()
-    elif neg_count > pos_count:
-        data[data[SCORE_COL] == 0] = data[data[SCORE_COL] == 0][-pos_count:]
-        data = data.dropna()
-    return data
-
-
-if __name__ == "__main__":
-    v1 = V1(epochs=8)
-    data = equalize_distribution(load_data())
-    v1.fit(data)
-    v1.save("trained107")
-    v1.load("trained107")
-    pprint(
-        v1.score(
-            "Apple's sales dropped 10 percent today",
-            "the most amazing product",
-            "your mom is the best",
-            "i love your mom",
-            "you're the worst",
-        )
-    )
