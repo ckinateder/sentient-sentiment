@@ -87,13 +87,19 @@ scores = v1.score(
 `scores` returns a dictionary in the format `text: score`, with `score` being between -1 and 1.
 
 ```python
-{'Bitcoin $100,000 may be conservative, analyst says': 0.6164,
- 'Bitcoin Rally Reaches Its Risky Level For October': -0.952,
- 'Bitcoin tops $60,000 for first time in six months as traders bet on ETF approval': 0.5431,
- 'Dow adds 300 points following earnings beats, surprise retail sales gain': 0.923,
- 'Professor who called Dow 20,000 says he’s nervous about trends in inflation that could spark a stock-market correction': -0.9618}
+{'Bitcoin $100,000 may be conservative, analyst says': 0.6149,
+ 'Bitcoin Rally Reaches Its Risky Level For October': -0.9514,
+ 'Bitcoin tops $60,000 for first time in six months as traders bet on ETF approval': 0.5372,
+ 'Dow adds 300 points following earnings beats, surprise retail sales gain': 0.9218,
+ 'Professor who called Dow 20,000 says he’s nervous about trends in inflation that could spark a stock-market correction': -0.9623}
 ```
+
+## Accuracy
+
+Right now, the accuracy on the test set with an 80/20 split ranges between **86% and 96%**.
 
 ## Next Steps
 
-Obviously, this is still a work in progress. I'd like to obtain better datasets and improve the metrics on the model.
+Obviously, this is still a work in progress. I'd like to obtain better datasets (ones that are more geared towards financial news) and improve the metrics on the model. This will be integrated directly with the news gathering feature of my work on [abraham](https://github.com/ckinateder/abraham). I also plan to integrate this with [Google Trends](https://github.com/GeneralMills/pytrends) to see what correlations can be extracted.
+
+-- Calvin

@@ -3,7 +3,7 @@ from pprint import pprint
 
 if __name__ == "__main__":
     v1 = V1()
-    v1.load("trained107")
+    v1.load("test-model")
     pprint(
         v1.score(
             "Bitcoin tops $60,000 for first time in six months as traders bet on ETF approval",

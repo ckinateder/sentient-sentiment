@@ -66,7 +66,7 @@ def load_data():
 
     data[SCORE_COL] = np.select(
         [data[SCORE_COL] == "positive", data[SCORE_COL] == "negative"],
-        [1, -1],
+        [1, 0],
     )  # convert to 1 for positive and 0 for negative
 
     return data
@@ -89,6 +89,6 @@ def equalize_distribution(
 
 if __name__ == "__main__":
     v1 = V1(epochs=8)
-    data = load_data()
+    data = equalize_distribution(load_data())
     v1.fit(data)
     v1.save("test-model")
